@@ -1,32 +1,41 @@
-from flask import Flask, request, render_template_string
 import os
+from flask import Flask, request, send_from_directory, render_template_string
 from datetime import datetime
 
 app = Flask(__name__)
 
-# Diretório onde os arquivos serão salvos
-UPLOAD_FOLDER = os.path.join(os.path.expanduser("~"), "UPLOAD_FOLDER")  # Diretório do usuário
+# Definir o diretório da pasta de uploads (dentro da pasta do usuário)
+UPLOAD_FOLDER = os.path.join(os.path.expanduser("~"), "UPLOAD_FOLDER")
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 # Cria o diretório de upload se não existir
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Página HTML simples para upload e entrada de texto
+# Página HTML simples para upload, entrada de texto e lista de arquivos
 HTML_TEMPLATE = '''
 <!doctype html>
-<title>Upload de Arquivo</title>
+<title>Gerenciador de Arquivos</title>
 <h1>Upload de um arquivo</h1>
 <form method=post enctype=multipart/form-data>
   <input type=file name=file>
   <input type=submit value=Upload>
 </form>
+
 <h1>Enviar Texto</h1>
 <form method=post>
   <textarea name="texto" rows="10" cols="30" placeholder="Digite seu texto aqui..."></textarea><br>
   <input type=submit value="Enviar Texto">
 </form>
+
+<h1>Arquivos disponíveis para download</h1>
+<ul>
+    {% for file in files %}
+        <li><a href="{{ url_for('download_file', filename=file) }}">{{ file }}</a></li>
+    {% endfor %}
+</ul>
 '''
 
+# Página inicial com upload, envio de texto e lista de arquivos
 @app.route('/', methods=['GET', 'POST'])
 def upload_file():
     if request.method == 'POST':
@@ -34,7 +43,7 @@ def upload_file():
         if 'file' in request.files:
             file = request.files['file']
             if file.filename == '':
-                return 'No selected file'
+                return 'Nenhum arquivo selecionado'
             # Salva o arquivo
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], file.filename))
             return 'Arquivo enviado com sucesso!'
@@ -50,7 +59,14 @@ def upload_file():
                 file.write(texto)
             return f'Arquivo {filename} criado com sucesso!'
 
-    return render_template_string(HTML_TEMPLATE)
+    # Lista os arquivos no diretório de upload
+    files = os.listdir(app.config['UPLOAD_FOLDER'])
+    return render_template_string(HTML_TEMPLATE, files=files)
+
+# Rota para download dos arquivos
+@app.route('/download/<filename>')
+def download_file(filename):
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename, as_attachment=True)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
